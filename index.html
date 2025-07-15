@@ -183,10 +183,6 @@
             display: none !important;
         }
     </style>
-    <!-- Updated Firebase SDKs to latest version (v11.10.0) -->
-    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js"></script>
 </head>
 <body>
     <header>
@@ -259,8 +255,12 @@
 
     <audio id="alertSound" src="https://www.soundjay.com/buttons/bell-ring-01.mp3"></audio>
 
-    <script>
-    // Your web app's Firebase configuration (pasted from Firebase console)
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { getDatabase, ref, onValue, set, runTransaction, remove, push } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+
+    // Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyCckPaSlUCRJraoOXCMM3PFz7lMCOksZOo",
       authDomain: "call-system-90422.firebaseapp.com",
@@ -270,172 +270,184 @@
       messagingSenderId: "861977044341",
       appId: "1:861977044341:web:61320f17f243684c6ddf3c"
     };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.database();
 
-        let managerId = new URLSearchParams(window.location.search).get('manager');
-        let queueRef, counterRef, calledRef;
-        const loginSection = document.getElementById('loginSection');
-        const managerCard = document.getElementById('managerCard');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const noManagerMessage = document.getElementById('noManagerMessage');
-        const joinBtn = document.getElementById('joinBtn');
-        const modal = document.getElementById('modal');
-        const authMessage = document.getElementById('authMessage');
-        const statusDiv = document.getElementById('status');
-        const callNextBtn = document.getElementById('callNextBtn');
-        const completeCallBtn = document.getElementById('completeCallBtn');
-        const queueList = document.getElementById('queueList');
-        const noQueue = document.getElementById('noQueue');
-        const queueCount = document.getElementById('queueCount');
-        const alertSound = document.getElementById('alertSound');
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
 
-        function setRefs() {
-            if (!managerId) return;
-            queueRef = db.ref(`queues/${managerId}/queue`);
-            counterRef = db.ref(`queues/${managerId}/counter`);
-            calledRef = db.ref(`queues/${managerId}/currentCalled`);
+    let managerId = new URLSearchParams(window.location.search).get('manager');
+    let queueRef, counterRef, calledRef;
+    const loginSection = document.getElementById('loginSection');
+    const managerCard = document.getElementById('managerCard');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const noManagerMessage = document.getElementById('noManagerMessage');
+    const joinBtn = document.getElementById('joinBtn');
+    const modal = document.getElementById('modal');
+    const authMessage = document.getElementById('authMessage');
+    const statusDiv = document.getElementById('status');
+    const callNextBtn = document.getElementById('callNextBtn');
+    const completeCallBtn = document.getElementById('completeCallBtn');
+    const queueList = document.getElementById('queueList');
+    const noQueue = document.getElementById('noQueue');
+    const queueCount = document.getElementById('queueCount');
+    const alertSound = document.getElementById('alertSound');
 
-            // Listen for queue updates
-            queueRef.orderByChild('order').on('value', snapshot => {
-                queueList.innerHTML = '';
-                let count = 0;
-                snapshot.forEach(child => {
-                    const item = child.val();
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>Order ${item.order}: ${item.name}</strong><br>Purpose: ${item.purpose}<br>Duration: ${item.duration}<br>Notes: ${item.notes || 'None'}`;
-                    queueList.appendChild(li);
-                    count++;
-                });
-                queueCount.textContent = count;
-                noQueue.style.display = count === 0 ? 'block' : 'none';
+    function setRefs() {
+        if (!managerId) return;
+        queueRef = ref(db, `queues/${managerId}/queue`);
+        counterRef = ref(db, `queues/${managerId}/counter`);
+        calledRef = ref(db, `queues/${managerId}/currentCalled`);
+
+        // Listen for queue updates
+        onValue(queueRef, snapshot => {
+            queueList.innerHTML = '';
+            let count = 0;
+            snapshot.forEach(child => {
+                const item = child.val();
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>Order ${item.order}: ${item.name}</strong><br>Purpose: ${item.purpose}<br>Duration: ${item.duration}<br>Notes: ${item.notes || 'None'}`;
+                queueList.appendChild(li);
+                count++;
             });
-
-            // Listen for current called
-            calledRef.on('value', snapshot => {
-                const called = snapshot.val();
-                if (called) {
-                    statusDiv.textContent = `In call with ${called.name}`;
-                    statusDiv.classList.add('in-call');
-                    callNextBtn.disabled = true;
-                    completeCallBtn.disabled = false;
-                } else {
-                    statusDiv.textContent = 'Ready to take calls';
-                    statusDiv.classList.remove('in-call');
-                    callNextBtn.disabled = false;
-                    completeCallBtn.disabled = true;
-                }
-            });
-        }
-
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                managerId = managerId || user.uid;
-                if (!new URLSearchParams(window.location.search).get('manager')) {
-                    window.location.search = `?manager=${user.uid}`;
-                }
-                if (managerId === user.uid) {
-                    loginSection.classList.add('hidden');
-                    managerCard.classList.remove('hidden');
-                    logoutBtn.classList.remove('hidden');
-                    setRefs();
-                }
-            } else {
-                loginSection.classList.remove('hidden');
-                managerCard.classList.add('hidden');
-                logoutBtn.classList.add('hidden');
-            }
-            // For non-managers
-            if (managerId) {
-                setRefs();
-                noManagerMessage.classList.add('hidden');
-                joinBtn.disabled = false;
-            } else {
-                noManagerMessage.classList.remove('hidden');
-                joinBtn.disabled = true;
-            }
+            queueCount.textContent = count;
+            noQueue.style.display = count === 0 ? 'block' : 'none';
         });
 
-        function showModal() {
-            modal.style.display = 'flex';
-        }
-
-        function hideModal() {
-            modal.style.display = 'none';
-            authMessage.textContent = '';
-        }
-
-        function login() {
-            const email = document.getElementById('authEmailInput').value;
-            const pass = document.getElementById('passInput').value;
-            auth.signInWithEmailAndPassword(email, pass)
-                .then(() => hideModal())
-                .catch(err => authMessage.textContent = err.message);
-        }
-
-        function signUp() {
-            const email = document.getElementById('authEmailInput').value;
-            const pass = document.getElementById('passInput').value;
-            auth.createUserWithEmailAndPassword(email, pass)
-                .then(() => hideModal())
-                .catch(err => authMessage.textContent = err.message);
-        }
-
-        function logout() {
-            auth.signOut();
-        }
-
-        function joinQueue() {
-            const name = document.getElementById('nameInput').value.trim();
-            const purpose = document.getElementById('purposeSelect').value;
-            const duration = document.getElementById('durationSelect').value;
-            const notes = document.getElementById('notesInput').value.trim();
-            if (!name || purpose === 'Select purpose...' || duration === 'Select duration...') {
-                alert('Please fill all required fields.');
-                return;
+        // Listen for current called
+        onValue(calledRef, snapshot => {
+            const called = snapshot.val();
+            if (called) {
+                statusDiv.textContent = `In call with ${called.name}`;
+                statusDiv.classList.add('in-call');
+                callNextBtn.disabled = true;
+                completeCallBtn.disabled = false;
+            } else {
+                statusDiv.textContent = 'Ready to take calls';
+                statusDiv.classList.remove('in-call');
+                callNextBtn.disabled = false;
+                completeCallBtn.disabled = true;
             }
-            counterRef.transaction(current => (current || 0) + 1, (error, committed, snapshot) => {
-                if (!error && committed) {
-                    const newOrder = snapshot.val();
-                    const newEntryRef = queueRef.push();
-                    newEntryRef.set({ order: newOrder, name, purpose, duration, notes });
-                    document.getElementById('joinMessage').textContent = `Joined! Your order is ${newOrder}.`;
-                    document.getElementById('nameInput').value = '';
-                    document.getElementById('purposeSelect').value = 'Select purpose...';
-                    document.getElementById('durationSelect').value = 'Select duration...';
-                    document.getElementById('notesInput').value = '';
-                }
-            });
-        }
+        });
+    }
 
-        function callNext() {
-            queueRef.orderByChild('order').limitToFirst(1).once('value', snapshot => {
-                if (snapshot.exists()) {
-                    snapshot.forEach(child => {
-                        const item = child.val();
-                        const key = child.key;
-                        calledRef.set(item);
-                        queueRef.child(key).remove();
-                        alertSound.play();
-                    });
-                } else {
-                    alert('Queue is empty.');
-                }
-            });
-        }
-
-        function completeCall() {
-            calledRef.remove();
-        }
-
-        function clearQueue() {
-            if (confirm('Clear the entire queue?')) {
-                queueRef.remove();
-                counterRef.set(0);
-                calledRef.remove();
+    onAuthStateChanged(auth, user => {
+        if (user) {
+            managerId = managerId || user.uid;
+            if (!new URLSearchParams(window.location.search).get('manager')) {
+                window.location.search = `?manager=${user.uid}`;
             }
+            if (managerId === user.uid) {
+                loginSection.classList.add('hidden');
+                managerCard.classList.remove('hidden');
+                logoutBtn.classList.remove('hidden');
+                setRefs();
+            }
+        } else {
+            loginSection.classList.remove('hidden');
+            managerCard.classList.add('hidden');
+            logoutBtn.classList.add('hidden');
         }
+        // For non-managers
+        if (managerId) {
+            setRefs();
+            noManagerMessage.classList.add('hidden');
+            joinBtn.disabled = false;
+        } else {
+            noManagerMessage.classList.remove('hidden');
+            joinBtn.disabled = true;
+        }
+    });
+
+    window.showModal = function() {
+        modal.style.display = 'flex';
+    }
+
+    window.hideModal = function() {
+        modal.style.display = 'none';
+        authMessage.textContent = '';
+    }
+
+    window.login = function() {
+        const email = document.getElementById('authEmailInput').value;
+        const pass = document.getElementById('passInput').value;
+        signInWithEmailAndPassword(auth, email, pass)
+            .then(() => hideModal())
+            .catch(err => authMessage.textContent = err.message);
+    }
+
+    window.signUp = function() {
+        const email = document.getElementById('authEmailInput').value;
+        const pass = document.getElementById('passInput').value;
+        createUserWithEmailAndPassword(auth, email, pass)
+            .then(() => hideModal())
+            .catch(err => authMessage.textContent = err.message);
+    }
+
+    window.logout = function() {
+        signOut(auth);
+    }
+
+    window.joinQueue = function() {
+        const name = document.getElementById('nameInput').value.trim();
+        const purpose = document.getElementById('purposeSelect').value;
+        const duration = document.getElementById('durationSelect').value;
+        const notes = document.getElementById('notesInput').value.trim();
+        if (!name || purpose === 'Select purpose...' || duration === 'Select duration...') {
+            alert('Please fill all required fields.');
+            return;
+        }
+        runTransaction(counterRef, current => (current || 0) + 1).then(result => {
+            if (result.committed) {
+                const newOrder = result.snapshot.val();
+                const newEntryRef = push(queueRef);
+                set(newEntryRef, { order: newOrder, name, purpose, duration, notes });
+                document.getElementById('joinMessage').textContent = `Joined! Your order is ${newOrder}.`;
+                document.getElementById('nameInput').value = '';
+                document.getElementById('purposeSelect').value = 'Select purpose...';
+                document.getElementById('durationSelect').value = 'Select duration...';
+                document.getElementById('notesInput').value = '';
+            }
+        });
+    }
+
+    window.callNext = function() {
+        const nextRef = ref(db, `queues/${managerId}/queue`);
+        onValue(nextRef, snapshot => {
+            if (snapshot.exists()) {
+                let minOrderKey = null;
+                let minOrder = Infinity;
+                let item = null;
+                snapshot.forEach(child => {
+                    const val = child.val();
+                    if (val.order < minOrder) {
+                        minOrder = val.order;
+                        minOrderKey = child.key;
+                        item = val;
+                    }
+                });
+                if (minOrderKey) {
+                    set(calledRef, item);
+                    remove(ref(db, `queues/${managerId}/queue/${minOrderKey}`));
+                    alertSound.play();
+                }
+            } else {
+                alert('Queue is empty.');
+            }
+        }, { onlyOnce: true });
+    }
+
+    window.completeCall = function() {
+        remove(calledRef);
+    }
+
+    window.clearQueue = function() {
+        if (confirm('Clear the entire queue?')) {
+            remove(queueRef);
+            set(counterRef, 0);
+            remove(calledRef);
+        }
+    }
     </script>
 </body>
 </html>
