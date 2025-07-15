@@ -92,17 +92,18 @@
         }
         #callNextBtn {
             background: #28a745;
-            display: inline-block;
-            width: 48%;
         }
         #completeCallBtn {
             background: #fd7e14;
-            display: inline-block;
-            width: 48%;
-            margin-left: 4%;
         }
         #clearQueueBtn {
             background: #dc3545;
+        }
+        #logoutBtn {
+            background: #dc3545;
+            width: auto;
+            padding: 10px 20px;
+            margin-top: 10px;
         }
         .status {
             background: #d4edda;
@@ -173,14 +174,13 @@
             border-radius: 10px;
             width: 300px;
         }
-        #logoutBtn {
-            background: #dc3545;
-            width: auto;
-            padding: 10px 20px;
-            margin-top: 10px;
-        }
         .hidden {
             display: none !important;
+        }
+        #currentCalledStatus {
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #fd7e14;
         }
     </style>
 </head>
@@ -235,6 +235,7 @@
 
     <div class="card" id="queueCard" style="margin-top: 20px;">
         <h2>Current Queue <span id="queueCount">0</span></h2>
+        <div id="currentCalledStatus" class="hidden">In call with: <span id="currentCalledName"></span></div>
         <ul id="queueList"></ul>
         <p id="noQueue">No appointments in queue</p>
     </div>
@@ -292,6 +293,8 @@
     const noQueue = document.getElementById('noQueue');
     const queueCount = document.getElementById('queueCount');
     const alertSound = document.getElementById('alertSound');
+    const currentCalledStatus = document.getElementById('currentCalledStatus');
+    const currentCalledName = document.getElementById('currentCalledName');
 
     function setRefs() {
         if (!managerId) return;
@@ -322,11 +325,14 @@
                 statusDiv.classList.add('in-call');
                 callNextBtn.disabled = true;
                 completeCallBtn.disabled = false;
+                currentCalledStatus.classList.remove('hidden');
+                currentCalledName.textContent = called.name;
             } else {
                 statusDiv.textContent = 'Ready to take calls';
                 statusDiv.classList.remove('in-call');
                 callNextBtn.disabled = false;
                 completeCallBtn.disabled = true;
+                currentCalledStatus.classList.add('hidden');
             }
         });
     }
