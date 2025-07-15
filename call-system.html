@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Calling System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #e0e7ff, #f0f4ff);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #6a5acd;
+            font-size: 2em;
+        }
+        h1::before {
+            content: "☎️ ";
+        }
+        .subtitle {
+            font-size: 1.2em;
+            color: #666;
+        }
+        .container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 20px;
+            flex: 1;
+        }
+        .card h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .card h2::before {
+            font-size: 1.2em;
+            margin-right: 10px;
+        }
+        #bookCard h2::before {
+            content: "👥";
+        }
+        #managerCard h2::before {
+            content: "🎯";
+        }
+        #queueCard h2::before {
+            content: "📋";
+            font-size: 1em;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        textarea {
+            height: 80px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        #joinBtn {
+            background: #4a6df7;
+        }
+        #callNextBtn {
+            background: #28a745;
+            display: inline-block;
+            width: 48%;
+        }
+        #completeCallBtn {
+            background: #fd7e14;
+            display: inline-block;
+            width: 48%;
+            margin-left: 4%;
+        }
+        #clearQueueBtn {
+            background: #dc3545;
+        }
+        .status {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .status::before {
+            content: "✅";
+            margin-right: 10px;
+        }
+        .status.in-call {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.in-call::before {
+            content: "📞";
+        }
+        #queueList {
+            list-style: none;
+            padding: 0;
+        }
+        #queueList li {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #eee;
+        }
+        #queueCount {
+            background: #6c757d;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 8px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        #noQueue {
+            text-align: center;
+            color: #888;
+        }
+        #loginSection {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #loginBtn {
+            background: #6c757d;
+            width: auto;
+            padding: 10px 20px;
+        }
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        #modalContent {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+        }
+        #logoutBtn {
+            background: #dc3545;
+            width: auto;
+            padding: 10px 20px;
+            margin-top: 10px;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Appointment Calling System</h1>
+        <p class="subtitle">Book your appointment and wait for your call</p>
+    </header>
+
+    <div id="loginSection">
+        <button id="loginBtn" onclick="showModal()">Login as Manager</button>
+    </div>
+
+    <div class="container">
+        <div class="card" id="bookCard">
+            <h2>Book Appointment</h2>
+            <label>Your Name</label>
+            <input type="text" id="nameInput" placeholder="Your Name">
+            <label>Purpose of Call</label>
+            <select id="purposeSelect">
+                <option>Select purpose...</option>
+                <option>Consultation</option>
+                <option>Meeting</option>
+                <option>Support</option>
+                <option>Other</option>
+            </select>
+            <label>Estimated Duration</label>
+            <select id="durationSelect">
+                <option>Select duration...</option>
+                <option>5 min</option>
+                <option>10 min</option>
+                <option>15 min</option>
+                <option>30 min</option>
+                <option>1 hour</option>
+            </select>
+            <label>Additional Notes (Optional)</label>
+            <textarea id="notesInput" placeholder="Any additional information..."></textarea>
+            <button id="joinBtn" onclick="joinQueue()">Join Queue</button>
+            <p id="joinMessage"></p>
+            <p id="noManagerMessage" class="hidden">Please access via a manager's shared link to book.</p>
+        </div>
+
+        <div class="card hidden" id="managerCard">
+            <h2>Manager Panel</h2>
+            <div id="status" class="status">Ready to take calls</div>
+            <button id="callNextBtn" onclick="callNext()">Call Next Person</button>
+            <button id="completeCallBtn" onclick="completeCall()" disabled>Complete Call</button>
+            <button id="clearQueueBtn" onclick="clearQueue()">Clear All Queue</button>
+            <button id="logoutBtn" class="hidden" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="card" id="queueCard" style="margin-top: 20px;">
+        <h2>Current Queue <span id="queueCount">0</span></h2>
+        <ul id="queueList"></ul>
+        <p id="noQueue">No appointments in queue</p>
+    </div>
+
+    <div id="modal">
+        <div id="modalContent">
+            <h3>Manager Login / Sign Up</h3>
+            <label>Email</label>
+            <input type="email" id="authEmailInput">
+            <label>Password</label>
+            <input type="password" id="passInput">
+            <button onclick="login()">Login</button>
+            <button onclick="signUp()">Sign Up</button>
+            <button onclick="hideModal()">Cancel</button>
+            <p id="authMessage"></p>
+        </div>
+    </div>
+
+    <audio id="alertSound" src="https://www.soundjay.com/buttons/bell-ring-01.mp3"></audio>
+
+    <script>
+    // Your web app's Firebase configuration (pasted from Firebase console)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCckPaSlUCRJraoOXCMM3PFz7lMCOksZOo",
+      authDomain: "call-system-90422.firebaseapp.com",
+      databaseURL: "https://call-system-90422-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "call-system-90422",
+      storageBucket: "call-system-90422.firebasestorage.app",
+      messagingSenderId: "861977044341",
+      appId: "1:861977044341:web:61320f17f243684c6ddf3c"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+        let managerId = new URLSearchParams(window.location.search).get('manager');
+        let queueRef, counterRef, calledRef;
+        const loginSection = document.getElementById('loginSection');
+        const managerCard = document.getElementById('managerCard');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const noManagerMessage = document.getElementById('noManagerMessage');
+        const joinBtn = document.getElementById('joinBtn');
+        const modal = document.getElementById('modal');
+        const authMessage = document.getElementById('authMessage');
+        const statusDiv = document.getElementById('status');
+        const callNextBtn = document.getElementById('callNextBtn');
+        const completeCallBtn = document.getElementById('completeCallBtn');
+        const queueList = document.getElementById('queueList');
+        const noQueue = document.getElementById('noQueue');
+        const queueCount = document.getElementById('queueCount');
+        const alertSound = document.getElementById('alertSound');
+
+        function setRefs() {
+            if (!managerId) return;
+            queueRef = db.ref(`queues/${managerId}/queue`);
+            counterRef = db.ref(`queues/${managerId}/counter`);
+            calledRef = db.ref(`queues/${managerId}/currentCalled`);
+
+            // Listen for queue updates
+            queueRef.orderByChild('order').on('value', snapshot => {
+                queueList.innerHTML = '';
+                let count = 0;
+                snapshot.forEach(child => {
+                    const item = child.val();
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>Order ${item.order}: ${item.name}</strong><br>Purpose: ${item.purpose}<br>Duration: ${item.duration}<br>Notes: ${item.notes || 'None'}`;
+                    queueList.appendChild(li);
+                    count++;
+                });
+                queueCount.textContent = count;
+                noQueue.style.display = count === 0 ? 'block' : 'none';
+            });
+
+            // Listen for current called
+            calledRef.on('value', snapshot => {
+                const called = snapshot.val();
+                if (called) {
+                    statusDiv.textContent = `In call with ${called.name}`;
+                    statusDiv.classList.add('in-call');
+                    callNextBtn.disabled = true;
+                    completeCallBtn.disabled = false;
+                } else {
+                    statusDiv.textContent = 'Ready to take calls';
+                    statusDiv.classList.remove('in-call');
+                    callNextBtn.disabled = false;
+                    completeCallBtn.disabled = true;
+                }
+            });
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                managerId = managerId || user.uid;
+                if (!new URLSearchParams(window.location.search).get('manager')) {
+                    window.location.search = `?manager=${user.uid}`;
+                }
+                if (managerId === user.uid) {
+                    loginSection.classList.add('hidden');
+                    managerCard.classList.remove('hidden');
+                    logoutBtn.classList.remove('hidden');
+                    setRefs();
+                }
+            } else {
+                loginSection.classList.remove('hidden');
+                managerCard.classList.add('hidden');
+                logoutBtn.classList.add('hidden');
+            }
+            // For non-managers
+            if (managerId) {
+                setRefs();
+                noManagerMessage.classList.add('hidden');
+                joinBtn.disabled = false;
+            } else {
+                noManagerMessage.classList.remove('hidden');
+                joinBtn.disabled = true;
+            }
+        });
+
+        function showModal() {
+            modal.style.display = 'flex';
+        }
+
+        function hideModal() {
+            modal.style.display = 'none';
+            authMessage.textContent = '';
+        }
+
+        function login() {
+            const email = document.getElementById('authEmailInput').value;
+            const pass = document.getElementById('passInput').value;
+            auth.signInWithEmailAndPassword(email, pass)
+                .then(() => hideModal())
+                .catch(err => authMessage.textContent = err.message);
+        }
+
+        function signUp() {
+            const email = document.getElementById('authEmailInput').value;
+            const pass = document.getElementById('passInput').value;
+            auth.createUserWithEmailAndPassword(email, pass)
+                .then(() => hideModal())
+                .catch(err => authMessage.textContent = err.message);
+        }
+
+        function logout() {
+            auth.signOut();
+        }
+
+        function joinQueue() {
+            const name = document.getElementById('nameInput').value.trim();
+            const purpose = document.getElementById('purposeSelect').value;
+            const duration = document.getElementById('durationSelect').value;
+            const notes = document.getElementById('notesInput').value.trim();
+            if (!name || purpose === 'Select purpose...' || duration === 'Select duration...') {
+                alert('Please fill all required fields.');
+                return;
+            }
+            counterRef.transaction(current => (current || 0) + 1, (error, committed, snapshot) => {
+                if (!error && committed) {
+                    const newOrder = snapshot.val();
+                    const newEntryRef = queueRef.push();
+                    newEntryRef.set({ order: newOrder, name, purpose, duration, notes });
+                    document.getElementById('joinMessage').textContent = `Joined! Your order is ${newOrder}.`;
+                    document.getElementById('nameInput').value = '';
+                    document.getElementById('purposeSelect').value = 'Select purpose...';
+                    document.getElementById('durationSelect').value = 'Select duration...';
+                    document.getElementById('notesInput').value = '';
+                }
+            });
+        }
+
+        function callNext() {
+            queueRef.orderByChild('order').limitToFirst(1).once('value', snapshot => {
+                if (snapshot.exists()) {
+                    snapshot.forEach(child => {
+                        const item = child.val();
+                        const key = child.key;
+                        calledRef.set(item);
+                        queueRef.child(key).remove();
+                        alertSound.play();
+                    });
+                } else {
+                    alert('Queue is empty.');
+                }
+            });
+        }
+
+        function completeCall() {
+            calledRef.remove();
+        }
+
+        function clearQueue() {
+            if (confirm('Clear the entire queue?')) {
+                queueRef.remove();
+                counterRef.set(0);
+                calledRef.remove();
+            }
+        }
+    </script>
+</body>
+</html>
